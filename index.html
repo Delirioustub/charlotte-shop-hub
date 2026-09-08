@@ -6,9 +6,228 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#1B365D" />
 <title>Charlotte Shop Hub</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{--navy:#1B365D;--gold:#C4A35A;--ink:#1A1A1A;--muted:#5C5C5C;--paper:#F3EEE4;--card:#FFFCF6;--ok:#2F6B4F;--live:#B42318;--line:#D7D0C3}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:var(--navy);color:#fff;padding:14px 16px 12px;border-bottom:4px solid var(--gold);position:sticky;top:0;z-index:20}
+header h1{margin:0;font-size:15px;letter-spacing:.08em}
+header p{margin:3px 0 0;font-size:11px;opacity:.8}
+nav{display:flex;gap:6px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:56px;z-index:19}
+nav button{flex:1;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:10px;font-size:13px;font-weight:700}
+nav button.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+main{padding:14px;max-width:820px;margin:0 auto 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em;margin:0 0 4px}
+input{width:100%;padding:14px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin-bottom:10px;background:#fff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{width:100%;border:0;border-radius:12px;padding:16px;font-weight:800;font-size:16px}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-live{background:var(--live);color:#fff}
+.btn-gold{background:var(--gold);color:var(--navy)}
+.btn-ghost{background:#fff;border:1px solid var(--line)}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.step{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;background:#fff;font-weight:800;font-size:15px}
+.step small{display:block;font-weight:500;color:var(--muted);margin-top:3px;font-size:11px}
+.clock{font-variant-numeric:tabular-nums;font-size:34px;font-weight:800;color:var(--navy)}
+.hint{font-size:12px;color:var(--muted);line-height:1.45}
+.pill{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px}
+.idle{background:#eee;color:var(--muted)}.run{background:#FDECEC;color:var(--live)}.done{background:#E5F4EA;color:var(--ok)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+.hidden{display:none}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--navy);color:#fff;border-radius:12px;padding:10px}
+.stat b{display:block;font-size:18px}.stat span{font-size:10px;opacity:.75}
+.who{font-size:13px;font-weight:700}
+</style>
 </head>
 <body>
-<p>Loading full app… If you see this, refresh after Pages is enabled.</p>
-<script>location.replace('./app.html')</script>
+<header>
+<h1>CHARLOTTE SHOP HUB</h1>
+<p>Sign in · work the order · submit · office enters P21</p>
+</header>
+<nav>
+<button class="active" data-tab="floor">Floor</button>
+<button data-tab="hub">Hub</button>
+</nav>
+<main>
+<section id="tab-floor">
+<div class="card">
+<label>SIGN IN</label>
+<input id="operator" placeholder="First name or initials" autocomplete="name" />
+<div class="row">
+<div><label>PRODUCTION ORDER</label><input id="job" inputmode="numeric" placeholder="9094840" /></div>
+<div><label>LOT (optional)</label><input id="lot" inputmode="numeric" placeholder="44506" /></div>
+</div>
+<button class="btn btn-ghost" id="scanBtn" type="button">Scan ticket camera</button>
+<div id="scanWrap" class="hidden" style="margin-top:8px">
+<div id="reader" style="width:100%"></div>
+<button class="btn btn-ghost" id="stopScan" type="button">Close camera</button>
+</div>
+<p class="hint">Type the numbers or use the camera. Then tap the step you are starting.</p>
+</div>
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:flex-end">
+<div><span id="pill" class="pill idle">IDLE</span><div class="clock" id="clock">00:00:00</div></div>
+<div class="hint" id="liveMeta">Waiting</div>
+</div>
+<p class="hint">Tap a step to start. Stop when that step is done. Submit when the whole job is finished.</p>
+<div class="steps" id="steps"></div>
+<div style="height:8px"></div>
+<button class="btn btn-live hidden" id="stopBtn" type="button">STOP THIS STEP</button>
+<div style="height:8px"></div>
+<button class="btn btn-gold" id="submitBtn" type="button">SUBMIT JOB TO HUB</button>
+<p class="hint" id="openHint"></p>
+</div>
+</section>
+<section id="tab-hub" class="hidden">
+<div class="card" id="gate">
+<label>HUB ACCESS · office / lead only</label>
+<input id="pin" type="password" inputmode="numeric" placeholder="PIN" />
+<button class="btn btn-navy" id="unlock" type="button">Open hub</button>
+<p class="hint">PIN is 4840. Use this list to key hours into P21, then mark entered.</p>
+</div>
+<div id="hubBody" class="hidden">
+<div class="card statgrid" id="stats"></div>
+<div class="card">
+<div class="row">
+<button class="btn btn-navy" id="exportBtn" type="button">Export CSV</button>
+<button class="btn btn-ghost" id="lockBtn" type="button">Lock hub</button>
+</div>
+<table>
+<thead><tr><th>Job</th><th>Who</th><th>Hours by step</th><th>P21</th></tr></thead>
+<tbody id="hubRows"></tbody>
+</table>
+</div>
+</div>
+</section>
+</main>
+<script>
+const STEPS=[["PULL","Find roll / bring to table"],["CUT","Cut to nest"],["SLIT","Slit"],["ENDLESS","Endless / splice"],["STAGE","Label + B STAGING"]];
+const PIN="4840";
+const $=id=>document.getElementById(id);
+const KEY="csh_jobs_v1",LIVE="csh_live_v1",OPEN="csh_open_v1";
+const loadJobs=()=>{try{return JSON.parse(localStorage.getItem(KEY)||"[]")}catch{return[]}};
+const saveJobs=rows=>localStorage.setItem(KEY,JSON.stringify(rows));
+const loadLive=()=>{try{return JSON.parse(localStorage.getItem(LIVE)||"null")}catch{return null}};
+const saveLive=v=>v?localStorage.setItem(LIVE,JSON.stringify(v)):localStorage.removeItem(LIVE);
+const loadOpen=()=>{try{return JSON.parse(localStorage.getItem(OPEN)||"null")}catch{return null}};
+const saveOpen=v=>v?localStorage.setItem(OPEN,JSON.stringify(v)):localStorage.removeItem(OPEN);
+const pad=n=>String(n).padStart(2,"0");
+const fmt=ms=>{const s=Math.max(0,Math.floor(ms/1000));return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`};
+const hrs=ms=>(ms/3600000).toFixed(2);
+$("steps").innerHTML=STEPS.map(([k,s])=>`<button class="step" data-step="${k}">${k}<small>${s}</small></button>`).join("");
+function meta(){return{operator:$("operator").value.trim()||"",job:$("job").value.trim()||"",lot:$("lot").value.trim()||""}}
+function ensureOpen(){
+  let o=loadOpen(); const m=meta();
+  if(!m.operator||!m.job) return null;
+  if(!o||o.job!==m.job||o.operator!==m.operator){o={operator:m.operator,job:m.job,lot:m.lot,started:Date.now(),steps:{}};saveOpen(o)}
+  else if(m.lot&&o.lot!==m.lot){o.lot=m.lot;saveOpen(o)}
+  $("openHint").textContent=`Open ticket: ${o.job} · ${o.operator}`+(o.lot?` · lot ${o.lot}`:"");
+  return o;
+}
+function paintLive(){
+  const live=loadLive();
+  if(!live){$("pill").className="pill idle";$("pill").textContent="IDLE";$("clock").textContent="00:00:00";$("liveMeta").textContent="No step running";$("stopBtn").classList.add("hidden");return}
+  $("pill").className="pill run";$("pill").textContent="RUNNING · "+live.step;$("clock").textContent=fmt(Date.now()-live.start);$("liveMeta").textContent=`${live.operator} · ${live.job}`;$("stopBtn").classList.remove("hidden");
+}
+function startStep(step){
+  const m=meta();
+  if(!m.operator){alert("Sign in first.");return}
+  if(!m.job){alert("Enter the production order.");return}
+  if(loadLive()) stopStep(false);
+  ensureOpen(); saveLive({...m,step,start:Date.now()}); paintLive();
+}
+function stopStep(warn=true){
+  const live=loadLive();
+  if(!live){if(warn) alert("Nothing is running.");return}
+  const o=ensureOpen()||{operator:live.operator,job:live.job,lot:live.lot,started:live.start,steps:{}};
+  o.steps[live.step]=(o.steps[live.step]||0)+(Date.now()-live.start);
+  saveOpen(o); saveLive(null); paintLive();
+}
+function submitJob(){
+  if(loadLive()) stopStep(false);
+  const o=loadOpen();
+  if(!o){alert("Nothing to submit.");return}
+  const total=Object.values(o.steps).reduce((a,b)=>a+b,0);
+  if(total<1000){alert("No time on this ticket yet.");return}
+  const jobs=loadJobs();
+  jobs.unshift({id:"J"+Date.now(),operator:o.operator,job:o.job,lot:o.lot,steps:o.steps,totalMs:total,submitted:Date.now(),p21:"READY"});
+  saveJobs(jobs); saveOpen(null);
+  $("openHint").textContent="Submitted. Start the next order when ready.";
+  alert("Job submitted to the hub.");
+}
+function renderHub(){
+  const jobs=loadJobs();
+  const ready=jobs.filter(j=>j.p21==="READY");
+  const hours=jobs.reduce((a,j)=>a+j.totalMs,0)/3600000;
+  $("stats").innerHTML=`<div class="stat"><b>${ready.length}</b><span>waiting for P21</span></div><div class="stat"><b>${jobs.length}</b><span>submitted jobs</span></div><div class="stat"><b>${hours.toFixed(1)}</b><span>hours captured</span></div>`;
+  $("hubRows").innerHTML=jobs.map(j=>{
+    const lines=STEPS.map(([k])=>j.steps[k]?`${k} ${hrs(j.steps[k])}`:null).filter(Boolean).join("<br>");
+    const btn=j.p21==="READY"?`<button class="btn btn-ok" data-enter="${j.id}" style="padding:8px;font-size:12px">Mark entered</button>`:`<span class="pill done">IN P21</span>`;
+    return `<tr><td><b>${j.job}</b>${j.lot?`<br>lot ${j.lot}`:""}<br><span class="hint">${new Date(j.submitted).toLocaleString()}</span></td><td class="who">${j.operator}</td><td>${lines}<br><b>${hrs(j.totalMs)} HR total</b></td><td>${btn}</td></tr>`;
+  }).join("")||`<tr><td colspan="4" class="hint">No submissions yet.</td></tr>`;
+}
+function exportCsv(){
+  const jobs=loadJobs();
+  const head="submitted,operator,prod_order,lot,pull_hr,cut_hr,slit_hr,endless_hr,stage_hr,total_hr,p21_status";
+  const body=jobs.map(j=>[new Date(j.submitted).toISOString(),j.operator,j.job,j.lot||"",hrs(j.steps.PULL||0),hrs(j.steps.CUT||0),hrs(j.steps.SLIT||0),hrs(j.steps.ENDLESS||0),hrs(j.steps.STAGE||0),hrs(j.totalMs),j.p21].map(v=>`"${v}"`).join(",")).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([head+"\n"+body],{type:"text/csv"})); a.download="charlotte-hub-p21.csv"; a.click();
+}
+document.querySelectorAll("nav button").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    $("tab-floor").classList.toggle("hidden",btn.dataset.tab!=="floor");
+    $("tab-hub").classList.toggle("hidden",btn.dataset.tab!=="hub");
+    if(btn.dataset.tab==="hub") renderHub();
+  };
+});
+$("steps").addEventListener("click",e=>{const b=e.target.closest(".step"); if(b) startStep(b.dataset.step)});
+$("stopBtn").onclick=()=>stopStep();
+$("submitBtn").onclick=submitJob;
+$("unlock").onclick=()=>{if($("pin").value===PIN){$("gate").classList.add("hidden");$("hubBody").classList.remove("hidden");renderHub()}else alert("Wrong PIN.")};
+$("lockBtn").onclick=()=>{$("hubBody").classList.add("hidden");$("gate").classList.remove("hidden");$("pin").value=""};
+$("exportBtn").onclick=exportCsv;
+$("hubRows").addEventListener("click",e=>{const id=e.target.dataset.enter; if(!id) return; const jobs=loadJobs(); const j=jobs.find(x=>x.id===id); if(j){j.p21="ENTERED";saveJobs(jobs);renderHub()}});
+["operator","job","lot"].forEach(id=>{const el=$(id); const s=localStorage.getItem("csh_"+id); if(s) el.value=s; el.addEventListener("change",()=>localStorage.setItem("csh_"+id,el.value))});
+let html5Qr=null;
+function applyCode(v){
+  v=String(v||"").trim();
+  if(!v) return;
+  if(!$("job").value) $("job").value=v;
+  else if(!$("lot").value) $("lot").value=v;
+  else $("job").value=v;
+  $("job").dispatchEvent(new Event("change"));
+  $("lot").dispatchEvent(new Event("change"));
+}
+async function startScan(){
+  if(!window.isSecureContext || typeof Html5Qrcode==="undefined"){
+    alert("Camera needs the live website (https), not a downloaded file. Type the order number for now.");
+    return;
+  }
+  $("scanWrap").classList.remove("hidden");
+  try{
+    html5Qr=new Html5Qrcode("reader");
+    await html5Qr.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:120}},text=>{applyCode(text);stopScan();},()=>{});
+  }catch(e){
+    alert("Camera blocked. Type the production order instead.");
+    stopScan();
+  }
+}
+async function stopScan(){
+  $("scanWrap").classList.add("hidden");
+  try{if(html5Qr) await html5Qr.stop()}catch(e){}
+  html5Qr=null;
+}
+$("scanBtn").onclick=startScan;
+$("stopScan").onclick=stopScan;
+if(loadOpen()) ensureOpen();
+paintLive(); setInterval(paintLive,250);
+</script>
 </body>
 </html>
